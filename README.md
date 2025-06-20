@@ -89,14 +89,14 @@ This:
 
 ## 🔍 Comparing the two approaches
 
-| Substring-based (`|=`)                                                | JSON-based (`| json` + field filters)                                 |
-|----------------------------------------------------------------------|------------------------------------------------------------------------|
-| Matches if string appears anywhere                                   | Matches only if extracted fields equal the values                     |
-| Can include false positives                                          | Accurate, depends on valid JSON                                       |
-| Faster, works with bad or multiline logs                             | Slower but more precise                                               |
-| Returns one time series                                              | Returns one per `level`, `function`, or other fields                  |
+| Substring-based (`|=`)                          | JSON-based (`| json` + field filters)           |
+|------------------------------------------------|-------------------------------------------------|
+| Matches if string appears anywhere             | Matches only if extracted fields match exactly  |
+| Can include false positives                    | Accurate, depends on valid JSON                 |
+| Faster, works with malformed or multiline logs | Slower but more precise                         |
+| Returns one time series                        | Returns one per `level`, `function`, etc.       |
 
-## 🌟 Bonus: Filtering to one line per request_id
+## 🌟 Bonus: Filtering to one line per request_id for hand_type dashboar. 
 
 ```logql
 {job="main/gtoglueb2c"} 
@@ -105,9 +105,15 @@ This:
 | event = "Strategy lookup completed" 
 | function = "main_lookup_strategy"
 ```
-
 This gave me exactly **one line per request_id** — perfect for accurate analysis. ✅
 
+But how did I figure that out?
+
+Because I'm a Jedi, obviously. 😏
+
+But I also copied some log lines into a JSON file and analyzed them in VS Code to figure out which field was **not repeated across all lines**, but also **not missing in any request_id** — that’s how I narrowed it down.
+
+> *“Patience you must have, young Padawan — in the logs, truth hides deep.”* 🧙‍♂️
 ---
 
 If you’ve made it this far — congrats! 🎉  
