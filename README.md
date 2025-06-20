@@ -90,7 +90,7 @@ This:
 ## 🔍 Comparing the two approaches
 
 | Substring-based (`|=`)                          | JSON-based (`| json` + field filters)           |
-|------------------------------------------------|-------------------------------------------------|
+|:-----------------------------------------------:|:-----------------------------------------------:|
 | Matches if string appears anywhere             | Matches only if extracted fields match exactly  |
 | Can include false positives                    | Accurate, depends on valid JSON                 |
 | Faster, works with malformed or multiline logs | Slower but more precise                         |
