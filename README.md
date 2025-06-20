@@ -41,7 +41,7 @@ In AWS logs (like Lambda, API Gateway, ECS), this usually means:
 - It’s the **final** step of the request lifecycle
 - It aggregates all the info: status, exceptions, timing, etc.
 
-So filtering for `"function": "wrapper"` can give you **one log line per request**, which is great for dashboards.
+So filtering for `"function": "wrapper"` can give you **one log line per request**, which is great for dashboards. But, you have to double check that! Tometimes, even with that filter one, deppending on your log, you may have more than onle line. If so, look for another key work
 
 ## ⚠️ Aggregation after `| json`? Not directly.
 
@@ -89,15 +89,14 @@ This:
 
 ## 🔍 Comparing the two approaches
 
-| Substring-based (`|=`)                        | JSON-based (`| json` + field filters)           |
-|-----------------------------------------------|-------------------------------------------------|
-| Matches if string appears anywhere            | Matches only if extracted fields match exactly  |
-| Can include false positives                   | Accurate, depends on valid JSON                 |
-| Faster, works with malformed or multiline logs| Slower but more precise                         |
-| Returns one time series                       | Returns one per `level`, `function`, etc.       |
+| Substring-based (`|=`)                         | JSON-based (`| json` + field filters)           |
+|------------------------------------------------|-------------------------------------------------|
+| Matches if string appears anywhere             | Matches only if extracted fields match exactly  |
+| Can include false positives                    | Accurate, depends on valid JSON                 |
+| Faster, works with malformed or multiline logs | Slower but more precise                         |
+| Returns one time series                        | Returns one per `level`, `function`, etc.       |
 
-
-## 🌟 Bonus: Filtering to one line per request_id for hand_type dashboar. 
+## 🌟 Bonus: Filtering to one line per request_id for hand_type dashboard.
 
 ```logql
 {job="main/gtoglueb2c"} 
