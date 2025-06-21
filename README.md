@@ -18,17 +18,17 @@ This filters logs where `request_id` is not empty, then applies a second filter 
 
 ## ✍️ Writing clean filters
 
-You can write like this:
+You can write like this (the app="deathstar" is the name of the app I want to obtain data, its is selected over 
+`Label browser` when you are building you dashboard):
 
 ```logql
-{app="gtoglueb2c"} | json | function = "wrapper" | level = "error"
+{app="deathstar"} | function = "wrapper" | level = "error"
 ```
 
 Or like this (same effect, easier to read - in my opinion):
 
 ```logql
 {app="gtoglueb2c"} 
-| json 
 | function = "wrapper" 
 | level = "error"
 ```
@@ -45,10 +45,13 @@ In AWS logs (like Lambda, API Gateway, ECS) is is common to find a line that end
 
 So filtering for `"function": "wrapper"` can give you **one log line per request**, which is great for dashboards. But, you have to double check that! Tometimes, even with that filter one, deppending on your log, you may have more than onle line. If so, look for another key work
 
+Ok, But where do I look fot the `"function": "wrapper"`, or how do I understand how loki handle my data? 
+
+There is no screet here. Its basically a soft skill that anyone can develop: Patience and antention... (need to explain better) 
+
 # Understanding `count`, `count_over_time`, and Series in Loki (Grafana)
 
 This document explains in simple terms how `count`, `count_over_time`, and nested queries behave in Loki's LogQL. It includes clear analogies and examples to help beginners understand the concepts.
-
 ---
 
 ## 👶 Imagine this
@@ -98,12 +101,6 @@ If you run something like `count({app="x"})`, it tells you **how many "lines" or
 | `count_over_time(...)`      | Counts **how many times** the event happened per type.  |
 | `count(count_over_time(...))`| Counts **how many types** had at least one event.       |
 | `count(...)` alone          | Counts **how many log series** exist.                   |
-
-## ⚠️ Aggregation after `| json`? Not directly.
-
-Ok, Nut where do I look fot the `"function": "wrapper"`, or how do I understand how loki handle my data? 
-
-There is no screet here. Its basically a soft skill that anyone can develop.  
 
 ## ⚠️ Aggregation after `| json`? Not directly.
 
