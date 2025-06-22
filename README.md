@@ -1,7 +1,10 @@
-# 🚀 LogQL: From Padawan to Jedi in the World of Logs - An ongoing project builded in order like star Wars Movies 😜
+# The Jedi's Guide to Mastering LogQL 🧙‍♂️
 
-If you're using Loki to explore logs more precisely — especially with AWS — this guide will take you from the basics to some handy advanced tricks. 😎
+So, you've started using Grafana Loki and feel like you're trying to pilot the Millennium Falcon with the instruction manual written in Shyriiwook. You're not alone. LogQL, Loki's query language, is incredibly powerful but can feel a bit... cryptic at first.
 
+This guide will take you from a Youngling to a Jedi Master, ready to slice and dice your logs with precision.
+
+---
 ## 🧪 First things first: Loki is *pipe-based* (`|`)
 
 > But what are *pipes*?
@@ -36,242 +39,152 @@ Or like this (same effect, easier to read - in my opinion):
 | level = "error"
 ```
 
-Even with all that, you may still see multiple log lines for example, that look exatcly the same. This happens when the system logs both the beginning and end of a process, or from different modules. You can sometimes de-duplicate by logic (if it is exctle 2 duplicated lines, simply divide the result by 2) — or (recommended) use better filters 👇
-
-## 💡 TIP: Look out for `"function": "wrapper"`
-
-In AWS logs (like Lambda, API Gateway, ECS) is is common to find a line that end with `"function": "wrapper"`, this usually means:
-
-- It’s a high-level middleware or handler
-- It’s the **final** step of the request lifecycle
-- It aggregates all the info: status, exceptions, timing, etc.
-
-So filtering for `"function": "wrapper"` can give you **one log line per request**, which is great for dashboards. But, you have to double check that! Tometimes, even with that filter one, deppending on your log, you may have more than onle line. If so, look for another key work
-
-Ok, But where do I look fot the `"function": "wrapper"`, or how do I understand how loki handle my data? 
-
-There is no screet here. Its basically a soft skill that anyone can develop: Patience and antention... You need to ckech yout logs and understand them. Pick a good sample, use VS Code tho have a clean look at them, and try to identify if some line, for example are repeated, wicht words can be used as key-words for specific filtering.
-
-# Understanding `count`, `count_over_time`, `sum`, `sum by`, `count by` and Series in Loki (Grafana)
-
-This document explains in simple terms how `count`, `count_over_time`, and nested queries behave in Loki's LogQL. It includes clear analogies and examples to help beginners understand the concepts.
 ---
 
-## 👶 Imagine this
-You have several **buckets**, one for each type of playing card (e.g., `King`, `Queen`, `Jack`, etc.).  
-Every time someone plays a card, you **write it on a piece of paper and drop it into the corresponding bucket**.
+## 🛠️ Part 1: The Basics - Your First Lightsaber
+
+Every LogQL query has three fundamental parts:
+
+1.  **Log Stream Selector (`{...}`)**: This is how you choose *which logs* to look at. Think of it as telling R2-D2 which ship's logs to access.
+2.  **Time Range (`[...]`)**: How far back in time you want to look.
+3.  **Filter (`|=` or `|`)**: What you're searching for *inside* the logs.
+
+Let's break down a simple query:
+
+```logql
+{app="deathstar"} |= "error" [5m]
+```
+
+-   `{app="deathstar"}`: This is the **Log Stream Selector**. We're only looking at logs from the application labeled `deathstar`. Labels are key-value pairs that you define when you set up your logging agent (like Promtail). **The more specific your labels, the faster your queries.**
+-   `|= "error"`: This is a **Line Filter**. It searches for the word "error" anywhere in the log line.
+-   `[5m]`: This is the **Time Range**. We're looking at the last 5 minutes of logs.
 
 ---
 
-### 📌 What does `count_over_time(...)` do?
-It looks into each bucket and **counts how many pieces of paper are inside**, meaning **how many times that card was played** in the chosen time window (e.g., last 10 minutes).
+## 🚀 Part 2: The Next Step - Parsing JSON with `| json`
 
-**Example result:**
-- `King`: 4  
-- `Queen`: 2  
-- `Jack`: 0
+A lot of modern logs are structured as JSON. Plain-text searching with `|=` works, but it's like using a club instead of a lightsaber. It's clumsy.
 
----
+Enter the `| json` parser. This transforms your JSON log line into a set of fields you can query directly.
 
-### 📌 What does `count(count_over_time(...))` do?
-This part **doesn’t care how many papers are in each bucket**, it just wants to know:
-> **How many buckets have at least 1 paper inside?**
+**Example Log Line:**
+```json
+{
+  "level": "error",
+  "message": "Alderaan is not a valid target.",
+  "request_id": "123-abc",
+  "function": "fire_laser"
+}
+```
 
-So:
-- `King`: 4 → ✅ counted  
-- `Queen`: 2 → ✅ counted  
-- `Jack`: 0 → ❌ ignored
+Instead of doing `|= "error"`, you can be much more precise:
 
-**Final result = 2 buckets with paper**, so `count(...)` returns **2**.
+```logql
+{app="deathstar"} | json | level = "error"
+```
 
----
-
-### 📌 What does `count(...)` alone do?
-When used on its own, `count()` just **counts how many different time series exist** — meaning **how many log groups**, usually defined by labels like `hand_type`, `job`, etc.  
-If you run something like `count({app="x"})`, it tells you **how many "lines" or series there are**, but **not how many events are in each**.
+-   `| json`: This tells LogQL, "Hey, treat the log line as JSON."
+-   `| level = "error"`: This is a **Label Filter**. After parsing, `level` becomes a temporary label you can filter on. This is much more accurate because it will only match the value of the `level` field, not just the word "error" appearing anywhere.
 
 ---
 
-### ✅ Connecting to your query
-- `count_over_time(...)` counts **how many times** the log appeared per label (`hand_type`).
-- The outer `count(...)` just counts **how many different labels had at least one log**.
+## ✨ Part 3: The Jedi Power - Aggregation with `sum by(...)`
 
----
+This is where you truly harness the Force. Aggregation lets you count, sum, and analyze your logs to create dashboards and alerts. This is what separates the Padawans from the Masters.
 
-## 🧠 Summary
-| Query part                   | What it does (simple explanation)                      |
-|-----------------------------|---------------------------------------------------------|
-| `count_over_time(...)`      | Counts **how many times** the event happened per type.  |
-| `count(count_over_time(...))`| Counts **how many types** had at least one event.       |
-| `count(...)` alone          | Counts **how many log series** exist.                   |
-
-# 🧒 Lets complicate a little bit?
-
-This may look complicated, but don’t worry! We’ll explain it like we’re talking to a kid. 🎒
-
-Here’s the full query:
+Let's look at a real-world query I wrote and break it down.
 
 ```logql
 sum by(hand_type) (
-  sum (
-    count_over_time(
-      {app="gtoglueb2c"}
-      | json
-      | event = "Strategy lookup completed"
-      [1m]
-    )
-  ) by (request_id)
+  count_over_time(
+    {job="main/gtoglueb2c"} 
+    | json 
+    | event="Strategy lookup completed" 
+    | request_id!=""
+    [1m]
+  )
 )
 ```
 
----
+This looks intimidating, but let's dismantle it piece by piece, from the inside out.
 
-## 🎮 What’s Happening?
+1.  **`{job="main/gtoglueb2c"} | json ... [1m]`**: We start by selecting logs from a specific job over the last minute and parsing them as JSON.
+2.  **`count_over_time(...)`**: This is a **Metric Query function**. It counts the number of log entries for each log stream within the given time range.
+3.  **`| request_id != ""`**: This is a crucial filter. In this application, I noticed that some logs didn't have a `request_id`. This filter ensures we only count logs that are part of an actual request, giving us one unique log line per `request_id`. This is useful when a single `request_id` might be associated with multiple series.
+4.  **`sum by(hand_type) (...)`**: Finally, we group these counts by the `hand_type` (e.g., "Flush", "Straight") to see how many times each hand type was used in total.
 
-Imagine you and your friends are playing a card game, and a magical notebook writes down every move. That notebook is your **log**!
-
-Each time someone plays a move, the notebook writes:
-
-- Who played (`request_id`)
-- What type of hand they used (`hand_type`)
-- What happened in the move (like `"Strategy lookup completed"`)
+**In plain English, this query answers:**
+> "In the last minute, how many times was each `hand_type` associated with the 'Strategy lookup completed' event, summed across all users?"
 
 ---
 
-## 🤩 What this Query Does
+### ⚠️ Why Vector Matching Fails in Some Operations
 
-Let’s break it down into easy steps:
-
-### 1. 📖 Look at Recent Pages Only
+Have you ever tried to divide two aggregated results and gotten an error?
 
 ```logql
-[1m]
-```
-
-This means:\
-“Only check the last 1 minute of logs — we don’t care about the old stuff!”
-
----
-
-### 2. 🔍 Find Special Moves
-
-```logql
-| event = "Strategy lookup completed"
-```
-
-We only want to count the special moves called **"Strategy lookup completed"**.
-
----
-
-### 3. 👦 Count Per Player (Request ID)
-
-```logql
-count_over_time(...)
-```
-
-This counts how many times each kid (identified by `request_id`) made that special move in the last minute.
-
----
-
-### 4. ➕ Add Up Per Player
-
-```logql
-sum (...) by (request_id)
-```
-
-Now we add up how many special moves each player made.
-
-Example:
-
-- Ana (`request_id=1`): 2 moves
-- João (`request_id=2`): 3 moves
-
----
-
-### 5. 🎴 Group by Hand Type
-
-```logql
-sum by(hand_type) (...)
-```
-
-Finally, we check **what kind of hand** (like "Flush", "Straight") each player used, and count how many times **each hand type** was used.
-
-Result might be:
-
-- Flush: 5 times
-- Straight: 2 times
-
----
-
-## ✅ What This Query Tells Us
-
-> “How many times each hand type was used in special moves, grouped by all the players, in the last 1 minute.”
-
-It looks at all the request IDs, counts their moves, and groups the total by the kind of hand (`hand_type`).
-
----
-Whu that doenst work on loki? 
-
-sum by(hand_type) ( 
-  count_over_time(
-    {app="gtoglueb2c"}
-    | json
-    | event="Strategy lookup completed"
-    [1m]
-  )
+# This query will fail!
+sum by(stormtrooper_rank) ( 
+  count_over_time({app="deathstar"} | json | event="core ready to fire" [1m])
 )
 /
 sum (
-  count_over_time(
-    {app="gtoglueb2c"}
-    | json
-    | event="Strategy lookup completed"
-    [1m]
-  )
+  count_over_time({app="deathstar"} | json | event="core ready to fire" [1m])
 )
 * 100
+```
 
-Essa query não é válida no Loki porque o Loki não suporta dividir diretamente um vetor (resultado de sum by(hand_type)(...)) por outro vetor (resultado de sum(...)), a não ser que a operação de divisão seja entre um vetor e um escalar, ou que os labels batam para a divisão vetor-a-vetor.
+This query is invalid in Loki because Loki doesn't support directly dividing one vector by another unless **the labels match perfectly** or you are dividing by a **scalar** (a single number).
 
-No seu caso:
+-   The top part (`sum by(stormtrooper_rank)`) creates a vector with the label `stormtrooper_rank`.
+-   The bottom part (`sum`) creates a result with no labels (it's aggregated to a single value but still treated as a vector with no labels).
 
-sum by(hand_type)(...) retorna várias séries (uma por cada hand_type)
+Loki doesn't know how to match the ranks from the top vector with the single total from the bottom.
 
-sum(...) retorna uma única série com total geral, mas com labels diferentes (ou nenhuma label)
+#### How to Fix It
 
-O Loki não sabe automaticamente dividir o vetor das mãos pelo total, porque eles não têm as mesmas labels para fazer o matching.
+-   **Vector ÷ Scalar → ✅ WORKS**
+    ```logql
+    sum by(hand_type)(...) / 123
+    ```
+-   **Vector ÷ Vector (with the same labels) → ✅ WORKS**
+    ```logql
+    sum by(hand_type)(count_over_time(...)) / sum by(hand_type)(count_over_time(...))
+    ```
+-   **Vector ÷ Vector (with different labels) → ❌ FAILS**
+    ```logql
+    sum by(hand_type)(...) / sum(...)
+    ```
 
 ---
 
-## ⚠️ Aggregation after `| json`? Not directly.
+## 🛠️ Part 4: Common Patterns & Best Practices
 
-You *can’t* use `count_over_time`, `sum_over_time`, etc., after using `| json` and field-based filters.
+### Aggregate after `| json`? Not Directly.
 
-Why? Because that turns logs into a *log stream*, not a *time series* that aggregations require.
+You *cannot* use metric query functions like `count_over_time` after a `| json` filter. These functions require a time series, but `| json` converts the logs into a filtered stream.
 
-### ✅ Solution: use substring filters (`|=`)
+### ✅ Solution 1: Use Substring Filters (`|=`)
+
+This is a faster, but less precise, way to filter. It checks if the text exists anywhere in the log line.
 
 ```logql
 count_over_time( 
-  {app="gtoglueb2c"} 
-  |= "function":"wrapper"" 
-  |= "level":"error" 
+  {app="DeathStar"} 
+  |= `"function":"wrapper"`
+  |= `"level":"error"`
   [5m]
 )
 ```
 
-This will:
+### ✅ Solution 2: Use `| json` with Grouping
 
-- Filter logs from the `gtoglueb2c` app
-- Match lines that contain `"function":"wrapper"` *and* `"level":"error"`
-- Count how many of these appear every 5 minutes
-
-## 🛠️ Cleaner workaround: use JSON and `sum by(...)`
+This is slower but more precise, as it matches exact field values after parsing the JSON.
 
 ```logql
 sum by (level) (
   count_over_time(
-    {app="gtoglueb2c"}
+    {app="DeathStar"}
     | json
     | function = "wrapper"
     | level = "error"
@@ -280,28 +193,31 @@ sum by (level) (
 )
 ```
 
-This:
+### 🔍 Comparing the Two Approaches
 
-1. Parses the log line as JSON
-2. Filters only logs where `function == "wrapper"` and `level == "error"`
-3. Counts them in 5-minute intervals
-4. Groups and sums by the `level` value (in this case, just `"error"`)
+| Approach               | Pros                                       | Cons                                    |
+|------------------------|--------------------------------------------|-----------------------------------------|
+| **Substring (`|=`)**    | Faster, works on non-JSON or malformed logs| Can cause false positives, less precise |
+| **JSON (`| json` + `by`)**| Precise, exact matching                  | Slower, requires valid JSON             |
 
-## 🔍 Comparing the two approaches
+---
 
-- **Substring-based (`|=`):**
-  - Matches if string appears anywhere
-  - Can include false positives
-  - Faster, works with malformed or multiline logs
-  - Returns one time series
+### 🌟 Bonus Tip: Finding One Log Line Per Request
 
-- **JSON-based (`| json` + field filters):**
-  - Matches only if extracted fields match exactly
-  - Accurate, depends on valid JSON
-  - Slower but more precise
-  - Returns one per `level`, `function`, etc.
+Sometimes, you'll see multiple log lines for the same event. To get accurate counts for a dashboard, you need to find a way to get **exactly one line per request**.
 
-## 🌟 Bonus: Filtering to one line per request_id for hand_type dashboard.
+In many AWS services (Lambda, ECS), a log line containing `"function": "wrapper"` is a good candidate, as it often represents the final, aggregated log for a request. But this is not a universal rule.
+
+**How to find the right filter:**
+> *"Patience you must have, my young Padawan—in the logs, the truth runs deep."* 🧙‍♂️
+
+There's no secret here. It's a skill anyone can develop: **Patience and attention**.
+
+1.  Grab a sample of logs for a single `request_id`.
+2.  Paste them into a text editor like VS Code to analyze the JSON structure.
+3.  Look for a key-value pair that is **present in every request** but **not repeated** within the logs for that same request.
+
+For example, I found that this filter gave me exactly one line per `request_id`, which was perfect for my analysis:
 
 ```logql
 {job="main/gtoglueb2c"} 
@@ -310,16 +226,7 @@ This:
 | event = "Strategy lookup completed" 
 | function = "main_lookup_strategy"
 ```
-This gave me exactly **one line per request_id** — perfect for accurate analysis. ✅
 
-But how did I figure that out?
-
-Because I'm a Jedi, obviously. 😏
-
-But I also copied some log lines into a JSON file and analyzed them in VS Code to figure out which field was **not repeated across all lines**, but also **not missing in any request_id** — that’s how I narrowed it down.
-
-> *“Patience you must have, young Padawan — in the logs, truth hides deep.”* 🧙‍♂️
 ---
 
-If you’ve made it this far — congrats! 🎉  
-You’re no longer a Padawan. You’re ready to master LogQL like a true Jedi. 🧙‍♂️
+If you've made it this far, congratulations! 🎉 You are no longer a Padawan. You are ready to master LogQL like a true Jedi. 🧙‍♂️
