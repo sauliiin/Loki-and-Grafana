@@ -1,4 +1,4 @@
-# 🚀 LogQL: From Padawan to Jedi in the World of Logs - An ongoing project
+# 🚀 LogQL: From Padawan to Jedi in the World of Logs - An ongoing project builded in order like star Wars Movies 😜
 
 If you're using Loki to explore logs more precisely — especially with AWS — this guide will take you from the basics to some handy advanced tricks. 😎
 
@@ -21,19 +21,22 @@ This filters logs where `request_id` is not empty, then applies a second filter 
 You can write like this (the app="deathstar" is the name of the app I want to obtain data, its is selected over 
 `Label browser` when you are building you dashboard):
 
+Obs: If your logs are seen at loki as json files, simple put `| json` before using the filters. If you tipe slowly, you will see hinst for witch terms you can use.
+
 ```logql
-{app="deathstar"} | function = "wrapper" | level = "error"
+{app="deathstar"} | json | function = "wrapper" | level = "error"
 ```
 
 Or like this (same effect, easier to read - in my opinion):
 
 ```logql
-{app="gtoglueb2c"} 
+{app="gtoglueb2c"}
+| json
 | function = "wrapper" 
 | level = "error"
 ```
 
-Even with all that, you may still see multiple log lines for example, that look exatcly the same. This happens when the system logs both the beginning and end of a process, or from different modules. You can sometimes de-duplicate by logic (if it is exctle 2 duplicated lines, simply divide the result by 2) — or use better filters 👇
+Even with all that, you may still see multiple log lines for example, that look exatcly the same. This happens when the system logs both the beginning and end of a process, or from different modules. You can sometimes de-duplicate by logic (if it is exctle 2 duplicated lines, simply divide the result by 2) — or (recommended) use better filters 👇
 
 ## 💡 TIP: Look out for `"function": "wrapper"`
 
@@ -47,9 +50,9 @@ So filtering for `"function": "wrapper"` can give you **one log line per request
 
 Ok, But where do I look fot the `"function": "wrapper"`, or how do I understand how loki handle my data? 
 
-There is no screet here. Its basically a soft skill that anyone can develop: Patience and antention... (need to explain better) 
+There is no screet here. Its basically a soft skill that anyone can develop: Patience and antention... You need to ckech yout logs and understand them. Pick a good sample, use VS Code tho have a clean look at them, and try to identify if some line, for example are repeated, wicht words can be used as key-words for specific filtering.
 
-# Understanding `count`, `count_over_time`, and Series in Loki (Grafana)
+# Understanding `count`, `count_over_time`, `sum`, `sum by`, `count by` and Series in Loki (Grafana)
 
 This document explains in simple terms how `count`, `count_over_time`, and nested queries behave in Loki's LogQL. It includes clear analogies and examples to help beginners understand the concepts.
 ---
@@ -101,6 +104,112 @@ If you run something like `count({app="x"})`, it tells you **how many "lines" or
 | `count_over_time(...)`      | Counts **how many times** the event happened per type.  |
 | `count(count_over_time(...))`| Counts **how many types** had at least one event.       |
 | `count(...)` alone          | Counts **how many log series** exist.                   |
+
+# 🧒 Lets complicate a little bit?
+
+This may look complicated, but don’t worry! We’ll explain it like we’re talking to a kid. 🎒
+
+Here’s the full query:
+
+```logql
+sum by(hand_type) (
+  sum (
+    count_over_time(
+      {app="gtoglueb2c"}
+      | json
+      | event = "Strategy lookup completed"
+      [1m]
+    )
+  ) by (request_id)
+)
+```
+
+---
+
+## 🎮 What’s Happening?
+
+Imagine you and your friends are playing a card game, and a magical notebook writes down every move. That notebook is your **log**!
+
+Each time someone plays a move, the notebook writes:
+
+- Who played (`request_id`)
+- What type of hand they used (`hand_type`)
+- What happened in the move (like `"Strategy lookup completed"`)
+
+---
+
+## 🤩 What the Query Does
+
+Let’s break it down into easy steps:
+
+### 1. 📖 Look at Recent Pages Only
+
+```logql
+[1m]
+```
+
+This means:\
+“Only check the last 1 minute of logs — we don’t care about the old stuff!”
+
+---
+
+### 2. 🔍 Find Special Moves
+
+```logql
+| event = "Strategy lookup completed"
+```
+
+We only want to count the special moves called **"Strategy lookup completed"**.
+
+---
+
+### 3. 👦 Count Per Player (Request ID)
+
+```logql
+count_over_time(...)
+```
+
+This counts how many times each kid (identified by `request_id`) made that special move in the last minute.
+
+---
+
+### 4. ➕ Add Up Per Player
+
+```logql
+sum (...) by (request_id)
+```
+
+Now we add up how many special moves each player made.
+
+Example:
+
+- Ana (`request_id=1`): 2 moves
+- João (`request_id=2`): 3 moves
+
+---
+
+### 5. 🎴 Group by Hand Type
+
+```logql
+sum by(hand_type) (...)
+```
+
+Finally, we check **what kind of hand** (like "Flush", "Straight") each player used, and count how many times **each hand type** was used.
+
+Result might be:
+
+- Flush: 5 times
+- Straight: 2 times
+
+---
+
+## ✅ What This Query Tells Us
+
+> “How many times each hand type was used in special moves, grouped by all the players, in the last 1 minute.”
+
+It looks at all the request IDs, counts their moves, and groups the total by the kind of hand (`hand_type`).
+
+---
 
 ## ⚠️ Aggregation after `| json`? Not directly.
 
