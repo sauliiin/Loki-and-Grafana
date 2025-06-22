@@ -138,7 +138,7 @@ Each time someone plays a move, the notebook writes:
 
 ---
 
-## 🤩 What the Query Does
+## 🤩 What this Query Does
 
 Let’s break it down into easy steps:
 
@@ -208,6 +208,38 @@ Result might be:
 > “How many times each hand type was used in special moves, grouped by all the players, in the last 1 minute.”
 
 It looks at all the request IDs, counts their moves, and groups the total by the kind of hand (`hand_type`).
+
+---
+Whu that doenst work on loki? 
+
+sum by(hand_type) ( 
+  count_over_time(
+    {app="gtoglueb2c"}
+    | json
+    | event="Strategy lookup completed"
+    [1m]
+  )
+)
+/
+sum (
+  count_over_time(
+    {app="gtoglueb2c"}
+    | json
+    | event="Strategy lookup completed"
+    [1m]
+  )
+)
+* 100
+
+Essa query não é válida no Loki porque o Loki não suporta dividir diretamente um vetor (resultado de sum by(hand_type)(...)) por outro vetor (resultado de sum(...)), a não ser que a operação de divisão seja entre um vetor e um escalar, ou que os labels batam para a divisão vetor-a-vetor.
+
+No seu caso:
+
+sum by(hand_type)(...) retorna várias séries (uma por cada hand_type)
+
+sum(...) retorna uma única série com total geral, mas com labels diferentes (ou nenhuma label)
+
+O Loki não sabe automaticamente dividir o vetor das mãos pelo total, porque eles não têm as mesmas labels para fazer o matching.
 
 ---
 
